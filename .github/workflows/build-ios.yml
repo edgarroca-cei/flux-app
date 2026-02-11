@@ -27,23 +27,69 @@ jobs:
       - name: Prebuild iOS
         run: npx expo prebuild --platform ios --clean
       
+      - name: Debug - List workspace contents
+        run: |
+          echo "=== Listing ios directory ==="
+          ls -la ios/
+          echo "=== Looking for .xcworkspace files ==="
+          find ios -name "*.xcworkspace"
+          echo "=== Looking for .xcodeproj files ==="
+          find ios -name "*.xcodeproj"
+      
       - name: Install CocoaPods
         run: |
           cd ios
           pod install
       
-      - name: List available schemes
+      - name: Debug - List schemes
         run: |
           cd ios
-          xcodebuild -list -workspace FLUX.xcworkspace
+          echo "=== Checking for workspace files ==="
+          ls -la *.xcworkspace 2>/dev/null || echo "No .xcworkspace files found"
+          
+          # Try to find the actual workspace name
+          WORKSPACE=$(find . -name "*.xcworkspace" -maxdepth 1 | head -n 1)
+          if [ -n "$WORKSPACE" ]; then
+            echo "Found workspace: $WORKSPACE"
+            xcodebuild -list -workspace "$WORKSPACE"
+          else
+            echo "No workspace found, trying .xcodeproj"
+            PROJECT=$(find . -name "*.xcodeproj" -maxdepth 1 | head -n 1)
+            if [ -n "$PROJECT" ]; then
+              echo "Found project: $PROJECT"
+              xcodebuild -list -project "$PROJECT"
+            fi
+          fi
       
       - name: Build iOS Archive
         run: |
           cd ios
-          xcodebuild -workspace FLUX.xcworkspace \
-            -scheme flux \
+          
+          # Find workspace dynamically
+          WORKSPACE=$(find . -name "*.xcworkspace" -maxdepth 1 | head -n 1 | sed 's|./||')
+          
+          if [ -z "$WORKSPACE" ]; then
+            echo "ERROR: No workspace found!"
+            exit 1
+          fi
+          
+          echo "Using workspace: $WORKSPACE"
+          
+          # Get the scheme name from the workspace
+          SCHEME=$(xcodebuild -list -workspace "$WORKSPACE" 2>/dev/null | grep -A 100 "Schemes:" | grep -v "Schemes:" | head -n 1 | xargs)
+          
+          if [ -z "$SCHEME" ]; then
+            echo "ERROR: No scheme found!"
+            exit 1
+          fi
+          
+          echo "Using scheme: $SCHEME"
+          
+          # Build
+          xcodebuild -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
             -configuration Release \
-            -archivePath build/flux.xcarchive \
+            -archivePath build/App.xcarchive \
             archive \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
@@ -53,7 +99,7 @@ jobs:
         run: |
           cd ios
           xcodebuild -exportArchive \
-            -archivePath build/flux.xcarchive \
+            -archivePath build/App.xcarchive \
             -exportPath build \
             -exportOptionsPlist ../ExportOptions.plist
       
