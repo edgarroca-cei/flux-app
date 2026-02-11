@@ -35,10 +35,10 @@ jobs:
       - name: Build iOS Archive
         run: |
           cd ios
-          xcodebuild -workspace flux.xcworkspace \
-            -scheme flux \
+          xcodebuild -workspace FLUX.xcworkspace \
+            -scheme FLUX \
             -configuration Release \
-            -archivePath build/flux.xcarchive \
+            -archivePath build/FLUX.xcarchive \
             archive \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
@@ -48,7 +48,7 @@ jobs:
         run: |
           cd ios
           xcodebuild -exportArchive \
-            -archivePath build/flux.xcarchive \
+            -archivePath build/FLUX.xcarchive \
             -exportPath build \
             -exportOptionsPlist ../ExportOptions.plist
       
