@@ -32,13 +32,18 @@ jobs:
           cd ios
           pod install
       
+      - name: List available schemes
+        run: |
+          cd ios
+          xcodebuild -list -workspace FLUX.xcworkspace
+      
       - name: Build iOS Archive
         run: |
           cd ios
           xcodebuild -workspace FLUX.xcworkspace \
-            -scheme FLUX \
+            -scheme flux \
             -configuration Release \
-            -archivePath build/FLUX.xcarchive \
+            -archivePath build/flux.xcarchive \
             archive \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
@@ -48,7 +53,7 @@ jobs:
         run: |
           cd ios
           xcodebuild -exportArchive \
-            -archivePath build/FLUX.xcarchive \
+            -archivePath build/flux.xcarchive \
             -exportPath build \
             -exportOptionsPlist ../ExportOptions.plist
       
