@@ -21,7 +21,7 @@ workflows:
           cd ios
           pod install
       
-      - name: Build unsigned ipa
+      - name: Build with automatic signing
         script: |
           cd ios
           
@@ -31,53 +31,50 @@ workflows:
           
           echo "Building with workspace: $WORKSPACE and scheme: $SCHEME"
           
-          # Build archive without signing
-          xcodebuild archive \
+          # Build with automatic signing (Codemagic handles this)
+          xcodebuild \
             -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
             -configuration Release \
+            -sdk iphoneos \
             -archivePath build/flux.xcarchive \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            archive
           
-          # The .app is in DerivedData, not in the xcarchive when building unsigned
-          echo "=== Looking for .app in build output ==="
+          echo "=== Archive created, exporting IPA ==="
           
-          # Search in common locations
-          APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "*.app" -path "*/Build/Products/Release-iphoneos/*.app" 2>/dev/null | grep -i flux | head -n 1)
+          # Export IPA with automatic signing
+          xcodebuild \
+            -exportArchive \
+            -archivePath build/flux.xcarchive \
+            -exportPath build \
+            -allowProvisioningUpdates \
+            -exportOptionsPlist ../ExportOptions.plist
           
-          if [ -z "$APP_PATH" ]; then
-            echo "Trying alternative search..."
-            APP_PATH=$(find . -name "*.app" -path "*/Release-iphoneos/*.app" 2>/dev/null | head -n 1)
+          echo "=== Checking for IPA ==="
+          ls -la build/
+          
+          # If xcodebuild export failed, try manual method
+          if [ ! -f build/*.ipa ]; then
+            echo "Export failed, trying manual IPA creation..."
+            
+            # Find the .app
+            APP_PATH=$(find build/flux.xcarchive -name "*.app" -type d | head -n 1)
+            
+            if [ -n "$APP_PATH" ]; then
+              echo "Found .app at: $APP_PATH"
+              mkdir -p Payload
+              cp -r "$APP_PATH" Payload/
+              zip -r build/FLUX.ipa Payload
+              rm -rf Payload
+              echo "Manual IPA created"
+            else
+              echo "ERROR: No .app found!"
+              exit 1
+            fi
           fi
           
-          if [ -z "$APP_PATH" ]; then
-            echo "ERROR: No .app found!"
-            echo "Searching everywhere..."
-            find ~/Library/Developer/Xcode/DerivedData -name "*.app" 2>/dev/null | head -10
-            exit 1
-          fi
-          
-          echo "Found .app at: $APP_PATH"
-          
-          # Create IPA manually
-          mkdir -p Payload
-          echo "Copying to Payload..."
-          cp -r "$APP_PATH" Payload/
-          
-          echo "Contents of Payload:"
-          ls -la Payload/
-          
-          echo "Creating IPA..."
-          zip -r FLUX.ipa Payload
-          
-          echo "IPA structure:"
-          unzip -l FLUX.ipa | head -20
-          
-          mkdir -p build
-          mv FLUX.ipa build/
-          echo "IPA created at build/FLUX.ipa"
+          echo "=== Final IPA ==="
+          ls -la build/*.ipa
           
     artifacts:
       - ios/build/FLUX.ipa
