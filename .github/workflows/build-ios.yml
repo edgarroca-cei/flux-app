@@ -61,7 +61,7 @@ jobs:
             fi
           fi
       
-      - name: Build iOS Archive
+      - name: Build iOS App
         run: |
           cd ios
           
@@ -85,37 +85,45 @@ jobs:
           
           echo "Using scheme: $SCHEME"
           
-          # Build
+          # Build with automatic signing
           xcodebuild -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
             -configuration Release \
-            -archivePath build/App.xcarchive \
-            archive \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            -sdk iphoneos \
+            -derivedDataPath build/DerivedData \
+            -allowProvisioningUpdates \
+            build
+          
+          echo "=== Build completed ==="
       
-      - name: Create IPA from Archive
+      - name: Create IPA from Build
         run: |
           cd ios
           
-          echo "=== Exploring xcarchive structure ==="
-          ls -la build/App.xcarchive/
-          echo "=== Looking for .app files ==="
-          find build/App.xcarchive -name "*.app" -type d
+          echo "=== Searching for .app in build output ==="
+          find build/DerivedData -name "*.app" -type d
           
-          # Create Payload directory
-          mkdir -p Payload
-          
-          # Find and copy .app to Payload
-          APP_PATH=$(find build/App.xcarchive -name "*.app" -type d | head -n 1)
+          # Find the .app in the build output
+          APP_PATH=$(find build/DerivedData/Build/Products/Release-iphoneos -name "*.app" -type d 2>/dev/null | head -n 1)
           
           if [ -z "$APP_PATH" ]; then
-            echo "ERROR: No .app found in xcarchive!"
+            echo "Not found in expected location, searching entire build directory..."
+            APP_PATH=$(find build/DerivedData -name "*.app" -type d | head -n 1)
+          fi
+          
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: No .app found in build output!"
+            echo "=== Build directory structure ==="
+            ls -laR build/DerivedData/Build/Products/ 2>/dev/null || ls -laR build/
             exit 1
           fi
           
           echo "Found app at: $APP_PATH"
+          
+          # Create Payload directory
+          mkdir -p Payload
+          
+          # Copy .app to Payload
           cp -r "$APP_PATH" Payload/
           
           # Create IPA (it's just a zip file)
