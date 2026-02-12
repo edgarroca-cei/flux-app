@@ -99,11 +99,24 @@ jobs:
         run: |
           cd ios
           
+          echo "=== Exploring xcarchive structure ==="
+          ls -la build/App.xcarchive/
+          echo "=== Looking for .app files ==="
+          find build/App.xcarchive -name "*.app" -type d
+          
           # Create Payload directory
           mkdir -p Payload
           
-          # Copy .app to Payload
-          cp -r build/App.xcarchive/Products/Applications/*.app Payload/
+          # Find and copy .app to Payload
+          APP_PATH=$(find build/App.xcarchive -name "*.app" -type d | head -n 1)
+          
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: No .app found in xcarchive!"
+            exit 1
+          fi
+          
+          echo "Found app at: $APP_PATH"
+          cp -r "$APP_PATH" Payload/
           
           # Create IPA (it's just a zip file)
           zip -r FLUX.ipa Payload
