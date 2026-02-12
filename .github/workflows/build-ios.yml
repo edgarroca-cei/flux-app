@@ -95,16 +95,30 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
       
-      - name: Export IPA
+      - name: Create IPA from Archive
         run: |
           cd ios
-          xcodebuild -exportArchive \
-            -archivePath build/App.xcarchive \
-            -exportPath build \
-            -exportOptionsPlist ../ExportOptions.plist
+          
+          # Create Payload directory
+          mkdir -p Payload
+          
+          # Copy .app to Payload
+          cp -r build/App.xcarchive/Products/Applications/*.app Payload/
+          
+          # Create IPA (it's just a zip file)
+          zip -r FLUX.ipa Payload
+          
+          # Move to build directory
+          mkdir -p build
+          mv FLUX.ipa build/
+          
+          # Cleanup
+          rm -rf Payload
+          
+          echo "IPA created successfully at build/FLUX.ipa"
       
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: FLUX-IPA
-          path: ios/build/*.ipa
+          path: ios/build/FLUX.ipa
