@@ -1,0 +1,53 @@
+workflows:
+  ios-workflow:
+    name: iOS Workflow
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+    environment:
+      groups:
+        - app_store_credentials
+      vars:
+        XCODE_WORKSPACE: "ios/flux.xcworkspace"
+        XCODE_SCHEME: "flux"
+      node: 18
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm install
+      
+      - name: Install CocoaPods dependencies
+        script: |
+          npx expo prebuild --platform ios --clean
+          cd ios
+          pod install
+      
+      - name: Build unsigned ipa
+        script: |
+          cd ios
+          
+          # Find workspace and scheme dynamically
+          WORKSPACE=$(find . -name "*.xcworkspace" -maxdepth 1 | head -n 1 | sed 's|./||')
+          SCHEME=$(xcodebuild -list -workspace "$WORKSPACE" 2>/dev/null | grep -A 100 "Schemes:" | grep -v "Schemes:" | head -n 1 | xargs)
+          
+          echo "Building with workspace: $WORKSPACE and scheme: $SCHEME"
+          
+          # Build archive without signing
+          xcodebuild archive \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -archivePath build/flux.xcarchive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+          
+          # Create IPA manually
+          mkdir -p Payload
+          APP_PATH=$(find build/flux.xcarchive -name "*.app" -type d | head -n 1)
+          cp -r "$APP_PATH" Payload/
+          zip -r FLUX.ipa Payload
+          mkdir -p build
+          mv FLUX.ipa build/
+          
+    artifacts:
+      - ios/build/FLUX.ipa
