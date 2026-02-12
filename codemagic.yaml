@@ -21,7 +21,7 @@ workflows:
           cd ios
           pod install
       
-      - name: Build with automatic signing
+      - name: Build iOS Archive
         script: |
           cd ios
           
@@ -31,50 +31,63 @@ workflows:
           
           echo "Building with workspace: $WORKSPACE and scheme: $SCHEME"
           
-          # Build with automatic signing (Codemagic handles this)
+          # Build archive without code signing (we'll sign later with ESign)
           xcodebuild \
             -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
             -configuration Release \
             -sdk iphoneos \
             -archivePath build/flux.xcarchive \
-            archive
+            archive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
           
-          echo "=== Archive created, exporting IPA ==="
+          echo "=== Archive created successfully ==="
           
-          # Export IPA with automatic signing
-          xcodebuild \
-            -exportArchive \
-            -archivePath build/flux.xcarchive \
-            -exportPath build \
-            -allowProvisioningUpdates \
-            -exportOptionsPlist ../ExportOptions.plist
+      - name: Create IPA from Archive
+        script: |
+          cd ios
           
-          echo "=== Checking for IPA ==="
-          ls -la build/
+          echo "=== Exploring archive structure ==="
+          ls -laR build/flux.xcarchive/
           
-          # If xcodebuild export failed, try manual method
-          if [ ! -f build/*.ipa ]; then
-            echo "Export failed, trying manual IPA creation..."
-            
-            # Find the .app
+          echo "=== Searching for .app files ==="
+          find build/flux.xcarchive -name "*.app" -type d
+          
+          # Try multiple search strategies
+          APP_PATH=$(find build/flux.xcarchive/Products/Applications -name "*.app" -type d 2>/dev/null | head -n 1)
+          
+          if [ -z "$APP_PATH" ]; then
+            echo "Not found in Products/Applications, searching entire archive..."
             APP_PATH=$(find build/flux.xcarchive -name "*.app" -type d | head -n 1)
-            
-            if [ -n "$APP_PATH" ]; then
-              echo "Found .app at: $APP_PATH"
-              mkdir -p Payload
-              cp -r "$APP_PATH" Payload/
-              zip -r build/FLUX.ipa Payload
-              rm -rf Payload
-              echo "Manual IPA created"
-            else
-              echo "ERROR: No .app found!"
-              exit 1
-            fi
           fi
           
-          echo "=== Final IPA ==="
-          ls -la build/*.ipa
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: No .app found in archive!"
+            echo "=== Archive contents ==="
+            ls -laR build/flux.xcarchive/
+            exit 1
+          fi
+          
+          echo "Found .app at: $APP_PATH"
+          
+          # Create IPA
+          mkdir -p Payload
+          cp -r "$APP_PATH" Payload/
+          
+          echo "=== Creating IPA ==="
+          zip -r FLUX.ipa Payload
+          
+          # Move to build directory
+          mkdir -p build
+          mv FLUX.ipa build/
+          
+          # Cleanup
+          rm -rf Payload
+          
+          echo "=== IPA created successfully ==="
+          ls -lh build/FLUX.ipa
           
     artifacts:
       - ios/build/FLUX.ipa
