@@ -31,17 +31,16 @@ workflows:
           
           echo "Building with workspace: $WORKSPACE and scheme: $SCHEME"
           
-          # Build directly to get .app file (not archive)
+          # Build with automatic signing (Codemagic handles this)
+          # The IPA can be re-signed later with ESign for 1 year validity
           xcodebuild \
             -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath build/DerivedData \
-            build \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            -allowProvisioningUpdates \
+            build
           
           echo "=== Build completed ==="
           
