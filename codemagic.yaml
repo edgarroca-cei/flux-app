@@ -21,7 +21,7 @@ workflows:
           cd ios
           pod install
       
-      - name: Build iOS Archive
+      - name: Build iOS App
         script: |
           cd ios
           
@@ -31,42 +31,39 @@ workflows:
           
           echo "Building with workspace: $WORKSPACE and scheme: $SCHEME"
           
-          # Build archive without code signing (we'll sign later with ESign)
+          # Build directly to get .app file (not archive)
           xcodebuild \
             -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
             -configuration Release \
             -sdk iphoneos \
-            -archivePath build/flux.xcarchive \
-            archive \
+            -derivedDataPath build/DerivedData \
+            build \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
           
-          echo "=== Archive created successfully ==="
+          echo "=== Build completed ==="
           
-      - name: Create IPA from Archive
+      - name: Create IPA from Build
         script: |
           cd ios
           
-          echo "=== Exploring archive structure ==="
-          ls -laR build/flux.xcarchive/
+          echo "=== Searching for .app in build output ==="
+          find build/DerivedData -name "*.app" -type d
           
-          echo "=== Searching for .app files ==="
-          find build/flux.xcarchive -name "*.app" -type d
-          
-          # Try multiple search strategies
-          APP_PATH=$(find build/flux.xcarchive/Products/Applications -name "*.app" -type d 2>/dev/null | head -n 1)
+          # Find the .app in the build output
+          APP_PATH=$(find build/DerivedData/Build/Products/Release-iphoneos -name "*.app" -type d 2>/dev/null | head -n 1)
           
           if [ -z "$APP_PATH" ]; then
-            echo "Not found in Products/Applications, searching entire archive..."
-            APP_PATH=$(find build/flux.xcarchive -name "*.app" -type d | head -n 1)
+            echo "Not found in expected location, searching entire build directory..."
+            APP_PATH=$(find build/DerivedData -name "*.app" -type d | head -n 1)
           fi
           
           if [ -z "$APP_PATH" ]; then
-            echo "ERROR: No .app found in archive!"
-            echo "=== Archive contents ==="
-            ls -laR build/flux.xcarchive/
+            echo "ERROR: No .app found in build output!"
+            echo "=== Build directory structure ==="
+            ls -laR build/DerivedData/Build/Products/ 2>/dev/null || ls -laR build/
             exit 1
           fi
           
@@ -79,7 +76,7 @@ workflows:
           echo "=== Creating IPA ==="
           zip -r FLUX.ipa Payload
           
-          # Move to build directory
+          # Move to final location
           mkdir -p build
           mv FLUX.ipa build/
           
