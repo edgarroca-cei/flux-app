@@ -41,13 +41,36 @@ workflows:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
           
+          # Debug: Show xcarchive structure
+          echo "=== xcarchive structure ==="
+          ls -la build/flux.xcarchive/
+          find build/flux.xcarchive -type d -name "*.app"
+          
           # Create IPA manually
           mkdir -p Payload
           APP_PATH=$(find build/flux.xcarchive -name "*.app" -type d | head -n 1)
+          
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: No .app found!"
+            exit 1
+          fi
+          
+          echo "Found .app at: $APP_PATH"
+          echo "Copying to Payload..."
           cp -r "$APP_PATH" Payload/
+          
+          echo "Contents of Payload:"
+          ls -la Payload/
+          
+          echo "Creating IPA..."
           zip -r FLUX.ipa Payload
+          
+          echo "IPA structure:"
+          unzip -l FLUX.ipa | head -20
+          
           mkdir -p build
           mv FLUX.ipa build/
+          echo "IPA created at build/FLUX.ipa"
           
     artifacts:
       - ios/build/FLUX.ipa
