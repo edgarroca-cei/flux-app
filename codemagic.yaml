@@ -41,21 +41,28 @@ workflows:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
           
-          # Debug: Show xcarchive structure
-          echo "=== xcarchive structure ==="
-          ls -la build/flux.xcarchive/
-          find build/flux.xcarchive -type d -name "*.app"
+          # The .app is in DerivedData, not in the xcarchive when building unsigned
+          echo "=== Looking for .app in build output ==="
           
-          # Create IPA manually
-          mkdir -p Payload
-          APP_PATH=$(find build/flux.xcarchive -name "*.app" -type d | head -n 1)
+          # Search in common locations
+          APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "*.app" -path "*/Build/Products/Release-iphoneos/*.app" 2>/dev/null | grep -i flux | head -n 1)
+          
+          if [ -z "$APP_PATH" ]; then
+            echo "Trying alternative search..."
+            APP_PATH=$(find . -name "*.app" -path "*/Release-iphoneos/*.app" 2>/dev/null | head -n 1)
+          fi
           
           if [ -z "$APP_PATH" ]; then
             echo "ERROR: No .app found!"
+            echo "Searching everywhere..."
+            find ~/Library/Developer/Xcode/DerivedData -name "*.app" 2>/dev/null | head -10
             exit 1
           fi
           
           echo "Found .app at: $APP_PATH"
+          
+          # Create IPA manually
+          mkdir -p Payload
           echo "Copying to Payload..."
           cp -r "$APP_PATH" Payload/
           
